@@ -1,0 +1,26 @@
+Jika melihat 7 tabel yang sudah Anda miliki sekarang, fondasinya sebenarnya sudah sangat kokoh untuk mencakup operasional harian.
+Namun, jika kita berbicara tentang penambahan tabel baru di MySQL untuk mengantisipasi kebocoran kas dan pengembangan usaha ritel fluktuatif Anda ke depan, ada 3 tabel tambahan yang sangat penting.
+Berikut adalah masukan tabel baru yang paling logis untuk sistem Anda:
+## 1. Tabel mutasi_stok (Kartu Stok Gudang)
+
+* Mengapa ini penting?: Saat ini, Observer Anda langsung mengubah angka di kolom stok pada tabel produks. Masalahnya, Anda tidak punya riwayat audit. Jika tiba-tiba stok sepatu berkurang, Anda tidak bisa melacak apakah berkurang karena terjual, atau karena ada barang yang rusak/hilang di toko.
+* Struktur Kolom: id, produk_id, transaction_id (nullable), tipe (masuk/keluar), jumlah, sisa_stok_saat_itu, keterangan (terjual, kulakan, atau barang rusak).
+* Manfaat: Menjadi Kartu Stok Otomatis. Anda bisa melacak sejarah pergerakan barang secara detail jika terjadi selisih antara sistem dan fisik di toko.
+
+## 2. Tabel histori_valuasi (Untuk Log Aset Fisik & Ternak)
+
+* Mengapa ini penting?: Anda memiliki menu Manajemen Aset (seperti Emas atau Sapi). Harga komoditas ini fluktuatif setiap bulan. Jika Anda langsung mengubah harga di kolom nilai_pasar_sekarang, grafik perkembangan kekayaan Anda di Dashboard tidak akan bisa terbentuk karena data lama terhapus.
+* Struktur Kolom: id, asset_id, tanggal_pencatatan, nilai_pasar_baru.
+* Manfaat: Sistem bisa menggambar Grafik Kenaikan Harta (Net Worth) Ayah dan Ibu dari bulan ke bulan. Selain itu, perhitungan Zakat Maal di akhir tahun (haul) akan jauh lebih presisi.
+
+## 3. Tabel kontak (Gabungan Supplier & Pelanggan Utang)
+
+* Mengapa ini penting?: Saat kulakan sapi atau sepatu, Anda belum mencatat kepada siapa modal itu dibayarkan. Begitu pula jika ada tetangga yang membeli barang secara tempo (utang dagang), Anda butuh mencatat nama pengutang agar tidak lupa menagih.
+* Struktur Kolom: id, nama, tipe (supplier / pelanggan / pihak_ketiga), nomor_hp, alamat.
+* Manfaat: Terintegrasi dengan pos utang-piutang syariah Anda. Catatan utang di tabel transaksi bisa langsung diarahkan ke nama orang yang bersangkutan secara rapi.
+
+------------------------------
+## 📌 Saran Urutan Prioritas
+Jika Anda ingin menambahkannya di masa depan, mulailah dari Tabel Mutasi Stok terlebih dahulu karena berkaitan langsung dengan pengamanan barang dagangan di toko ritel Anda agar tidak ada kehilangan yang tidak terdeteksi.
+Apakah dari ketiga pilihan tabel baru di atas, ada yang paling sesuai dengan kebutuhan kendali bisnis Anda saat ini?
+

@@ -1,0 +1,130 @@
+<?php
+
+namespace App\Filament\Resources\Assets\Tables;
+
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Columns\Summarizers\Sum; // Library resmi penghitung total otomatis di bawah tabel
+
+class AssetsTable
+{
+    public static function configure(Table $table): Table
+    {
+        return $table
+            ->columns([
+                TextColumn::make('name')
+                    ->label('Nama Aset')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('jenis')
+                    ->label('Jenis')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'hewan_ternak' => 'warning',
+                        'tanah_properti' => 'info',
+                        'emas_logam' => 'success',
+                        'pertanian_perkebunan' => 'primary',
+                        default => 'gray',
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true), // TAMBAHAN: Masuk sistem bongkar pasang, default disembunyikan agar layar lega
+
+                TextColumn::make('peruntukan')
+                    ->label('Status Fiqih')
+                    ->badge()
+                    ->color(fn (string $state): string => $state === 'tijarah' ? 'danger' : 'success')
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'tijarah' => 'Wajib Zakat (Tijarah)',
+                        'qunyah' => 'Simpanan (Qunyah)',
+                        default => $state
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true), // TAMBAHAN: Masuk sistem bongkar pasang, default disembunyikan agar layar lega
+
+                TextColumn::make('jumlah')
+                    ->label('Jumlah')
+                    ->formatStateUsing(fn ($record) => "{$record->jumlah} {$record->satuan}"),
+
+                // MODAL AWAL BULAT TANPA KOMA ,00
+                TextColumn::make('harga_beli')
+                    ->label('Modal Awal')
+                    ->numeric(decimalPlaces: 0, locale: 'id')
+                    ->sortable()
+                    ->summarize(Sum::make()->numeric(decimalPlaces: 0, locale: 'id')->prefix('Rp ')->label('Total Modal')),
+
+                // NILAI PASAR BULAT TANPA KOMA ,00
+                TextColumn::make('nilai_pasar_sekarang')
+                    ->label('Nilai Pasar')
+                    ->numeric(decimalPlaces: 0, locale: 'id')
+                    ->sortable()
+                    ->summarize(Sum::make()->numeric(decimalPlaces: 0, locale: 'id')->prefix('Rp ')->label('Total Valuasi')),
+
+                // PERBAIKAN UTAMA: Menghitung profit secara real-time & total summary yang lolos validasi framework
+                TextColumn::make('keuntungan')
+                    ->label('Profit / Kerugian')
+                    ->sortable()
+                    ->state(fn ($record) => $record->nilai_pasar_sekarang - $record->harga_beli)
+                    ->color(fn ($state): string => $state >= 0 ? 'success' : 'danger')
+                    ->formatStateUsing(fn ($state) => $state >= 0 ? '+ Rp ' . number_format($state, 0, ',', '.') : '- Rp ' . number_format(abs($state), 0, ',', '.'))
+                    ->summarize(
+                        Sum::make()
+                            ->label('Total Laba Bersih')
+                            ->formatStateUsing(function ($state, Table $table) {
+                                // Trik Cerdas: Menghitung selisih total kumulatif dari seluruh baris yang dirender layar
+                                $records = $table->getRecords();
+                                $totalProfit = $records->sum(fn ($r) => $r->nilai_pasar_sekarang - $r->harga_beli);
+                                return $totalProfit >= 0 ? '+ Rp ' . number_format($totalProfit, 0, ',', '.') : '- Rp ' . number_format(abs($totalProfit), 0, ',', '.');
+                            })
+                    ),
+
+                TextColumn::make('status_aset')
+                    ->label('Status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'aktif' => 'success',
+                        'lahir_di_kandang' => 'info',
+                        'terjual' => 'gray',
+                        'mati_rusak' => 'danger',
+                        'dikonsumsi' => 'warning',
+                        default => 'gray',
+                    }),
+
+                TextColumn::make('tanggal_beli')
+                    ->label('Tanggal Perolehan')
+                    ->date('d-m-Y')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('updated_at')
+                    ->label('Terakhir Cek Harga')
+                    ->dateTime('d-m-Y H:i')
+                    ->sortable()
+                    ->toggleable(),
+            ])
+            ->filters([
+                SelectFilter::make('jenis')
+                    ->label('Saring Jenis Aset')
+                    ->options([
+                        'hewan_ternak' => 'Hewan Ternak',
+                        'tanah_properti' => 'Tanah & Properti',
+                        'emas_logam' => 'Emas & Logam Mulia',
+                        'pertanian_perkebunan' => 'Pertanian & Perkebunan',
+                    ]),
+                SelectFilter::make('peruntukan')
+                    ->label('Saring Hukum Zakat')
+                    ->options([
+                        'qunyah' => 'Qunyah (Simpanan)',
+                        'tijarah' => 'Tijarah (Bisnis)',
+                    ]),
+                SelectFilter::make('status_aset')
+                    ->label('Saring Status Fisik')
+                    ->options([
+                        'aktif' => 'Aktif',
+                        'lahir_di_kandang' => 'Lahir di Kandang',
+                        'terjual' => 'Terjual',
+                        'mati_rusak' => 'Mati / Rusak',
+                        'dikonsumsi' => 'Dikonsumsi',
+                    ]),
+            ]);
+    }
+}
