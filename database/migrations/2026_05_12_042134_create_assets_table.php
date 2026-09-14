@@ -10,6 +10,7 @@ return new class extends Migration {
         Schema::create('assets', function (Blueprint $table) {
             $table->id();
             $table->string('name'); 
+            $table->boolean('is_saldo_awal')->default(false);
             
             // Klasifikasi Jenis Harta Syariah
             $table->enum('jenis', ['hewan_ternak', 'tanah_properti', 'emas_logam', 'pertanian_perkebunan', 'lainnya'])->default('lainnya')->index();

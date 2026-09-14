@@ -3,9 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class AssetLog extends Model 
 {
+    use SoftDeletes;
+
     protected $fillable = ['asset_id', 'tanggal', 'jenis_log', 'biaya_keluar', 'keterangan'];
 
     protected $casts = [
@@ -13,51 +17,29 @@ class AssetLog extends Model
         'biaya_keluar' => 'integer',
     ];
 
-    public function asset()
+    public function asset(): BelongsTo
     {
         return $this->belongsTo(Asset::class, 'asset_id');
     }
 
     protected static function booted()
     {
-        static::saved(function ($log) {
-            if ($log->biaya_keluar > 0) {
-                $asset = $log->asset;
-                if ($asset) {
-                    
-                    // --- PENGAMAN EDIT LOG: KALKULASI SINKRONISASI MODAL HISTORIS ---
-                    if ($log->wasRecentlyCreated) {
-                        // Jika log baru dibuat, langsung tambah harga beli secara penuh
-                        $asset->increment('harga_beli', $log->biaya_keluar);
-                    } else {
-                        // Jika log lama diedit, hitung selisih biaya baru dengan biaya lama agar modal tetap akurat
-                        $selisihBiaya = $log->biaya_keluar - $log->getOriginal('biaya_keluar');
-                        if ($selisihBiaya != 0) {
-                            $asset->increment('harga_beli', $selisihBiaya);
-                        }
-                    }
+        static::created(function (self $log) {
+            $log->syncAutomaticTransaction(0);
+        });
 
-                    // Penentuan nama kategori syariah sesuai pilar peruntukan Anda
-                    $namaKategori = $asset->peruntukan === 'tijarah' 
-                        ? 'Biaya Operasional Bisnis' 
-                        : 'Belanja Dapur & Sembako';
-
-                    $category = Category::where('name', $namaKategori)->first();
-
-                    if ($category) {
-                        Transaction::updateOrCreate(
-                            ['note' => "Otomatis: Biaya Perawatan Log ID-{$log->id}"],
-                            [
-                                'name' => "Perawatan [" . $asset->name . "] - " . $log->keterangan,
-                                'category_id' => $category->id,
-                                'is_expense' => true, // Selaku biaya perawatan kas berjalan harian
-                                'date' => $log->tanggal,
-                                'amount' => $log->biaya_keluar,
-                            ]
-                        );
-                    }
-                }
+        static::saved(function (self $log) {
+            if (! $log->wasChanged([
+                'asset_id',
+                'tanggal',
+                'jenis_log',
+                'biaya_keluar',
+                'keterangan',
+            ])) {
+                return;
             }
+
+            $log->syncAutomaticTransaction((int) $log->getOriginal('biaya_keluar'));
         });
 
         static::deleted(function ($log) {
@@ -67,8 +49,54 @@ class AssetLog extends Model
                     // Pengurangan harga beli saat log perawatan dihapus
                     $asset->decrement('harga_beli', $log->biaya_keluar);
                 }
-                Transaction::where('note', "Otomatis: Biaya Perawatan Log ID-{$log->id}")->delete();
             }
+
+            Transaction::where('asset_log_id', $log->id)->delete();
         });
+    }
+
+    private function syncAutomaticTransaction(int $biayaSebelumnya): void
+    {
+        $biayaSekarang = (int) $this->biaya_keluar;
+        $asset = $this->asset;
+        $tanggal = $this->tanggal ?? now();
+
+        if ($asset) {
+            $selisihBiaya = $biayaSekarang - $biayaSebelumnya;
+            if ($selisihBiaya > 0) {
+                $asset->increment('harga_beli', $selisihBiaya);
+            } elseif ($selisihBiaya < 0) {
+                $asset->decrement('harga_beli', abs($selisihBiaya));
+            }
+        }
+
+        if ($biayaSekarang <= 0) {
+            Transaction::where('asset_log_id', $this->id)->delete();
+
+            return;
+        }
+
+        if ($asset) {
+            $namaKategori = $asset->peruntukan === 'tijarah'
+                ? 'Biaya Operasional Bisnis'
+                : 'Belanja Dapur & Sembako';
+
+            $category = Category::where('name', $namaKategori)->first();
+
+            if ($category) {
+                Transaction::updateOrCreate(
+                    ['asset_log_id' => $this->id],
+                    [
+                        'asset_id' => $asset->id,
+                        'source' => 'asset_maintenance',
+                        'name' => "Perawatan [" . $asset->name . "] - " . $this->keterangan,
+                        'category_id' => $category->id,
+                        'is_expense' => true,
+                        'date' => $tanggal,
+                        'amount' => $biayaSekarang,
+                    ]
+                );
+            }
+        }
     }
 }

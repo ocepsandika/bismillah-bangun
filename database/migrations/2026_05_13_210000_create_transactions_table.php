@@ -14,6 +14,10 @@ return new class extends Migration {
             
             $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete(); 
             $table->foreignId('produk_id')->nullable()->constrained('produks')->nullOnDelete(); 
+            $table->foreignId('asset_id')->nullable()->constrained('assets')->nullOnDelete();
+            $table->foreignId('asset_log_id')->nullable()->constrained('asset_logs')->nullOnDelete();
+            $table->unique('asset_log_id');
+            $table->string('source', 30)->default('manual')->index();
             
             // Kolom kuantitas riil bahasa Indonesia untuk handle harga fluktuatif
             $table->integer('kuantitas')->default(1); 
@@ -21,7 +25,7 @@ return new class extends Migration {
             $table->boolean('is_expense')->default(true); 
             
             $table->date('date'); 
-            $table->string('date_hijri')->nullable()->index(); 
+            $table->string('date_hijri')->nullable(); 
             $table->unsignedTinyInteger('month_hijri')->nullable()->index(); 
             $table->unsignedSmallInteger('year_hijri')->nullable()->index(); 
             

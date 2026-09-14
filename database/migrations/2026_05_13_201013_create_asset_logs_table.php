@@ -16,6 +16,7 @@ return new class extends Migration {
             $table->bigInteger('biaya_keluar')->default(0); // Modal tambahan kapitalisasi pupuk/pakan
             $table->string('keterangan'); 
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
