@@ -30,4 +30,14 @@ class Produk extends Model
     {
         return $this->hasMany(Transaction::class, 'produk_id');
     }
+
+    /**
+     * Riwayat pergerakan stok (penjualan, kulakan, koreksi, penyesuaian
+     * manual, dst) - diisi otomatis oleh Transaction::ubahStok() dan oleh
+     * StockLog::catatPenyesuaianManual() untuk penyesuaian manual.
+     */
+    public function stockLogs(): HasMany
+    {
+        return $this->hasMany(StockLog::class)->latest();
+    }
 }

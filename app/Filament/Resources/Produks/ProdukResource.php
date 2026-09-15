@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Produks;
 use App\Filament\Resources\Produks\Pages\CreateProduk;
 use App\Filament\Resources\Produks\Pages\EditProduk;
 use App\Filament\Resources\Produks\Pages\ListProduks;
+use App\Filament\Resources\Produks\RelationManagers\StockLogsRelationManager;
 use App\Filament\Resources\Produks\Schemas\ProdukForm;
 use App\Filament\Resources\Produks\Tables\ProduksTable;
 use App\Models\Produk;
@@ -35,7 +36,7 @@ class ProdukResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            StockLogsRelationManager::class, //RIWAYAT PERGERAKAN STOK + PENYESUAIAN MANUAL
         ];
     }
 
