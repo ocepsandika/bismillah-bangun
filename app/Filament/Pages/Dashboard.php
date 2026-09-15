@@ -25,6 +25,7 @@ class Dashboard extends BaseDashboard
     {
         return [
             \App\Filament\Widgets\RingkasanSaldoSyariah::class,
+            \App\Filament\Widgets\TrenBulananPilarChart::class, // ðŸŒŸ GRAFIK TREN BULANAN BARU
         ];
     }
 
