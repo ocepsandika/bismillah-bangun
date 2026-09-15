@@ -17,7 +17,7 @@ class BudgetForm
     public static function configure(Schema $schema): Schema
     {
         $konversiKeHijriah = function ($tanggalMasehi) {
-            if (! $tanggalMasehi) return '---';
+            if (! $tanggalMasehi || ! class_exists(\IntlDateFormatter::class)) return '---';
             try {
                 $formatter = new \IntlDateFormatter(
                     'id_ID@calendar=islamic-umalqura', 
@@ -28,7 +28,7 @@ class BudgetForm
                 );
                 $formatter->setPattern('d MMMM yyyy');
                 return $formatter->format(new \DateTime($tanggalMasehi)) . ' H';
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 return '---';
             }
         };

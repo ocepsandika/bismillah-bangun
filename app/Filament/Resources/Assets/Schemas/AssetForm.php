@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Assets\Schemas;
 
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\DatePicker;
 use Filament\Schemas\Schema;
 
@@ -59,6 +60,11 @@ class AssetForm
                         'tijarah' => 'Tijarah (Komoditas Bisnis / Investasi Aktif - Wajib Zakat 2.5%)',
                     ])
                     ->default('qunyah'),
+
+                Toggle::make('is_saldo_awal')
+                    ->label('Aset Saldo Awal')
+                    ->default(false)
+                    ->helperText('Aktifkan jika aset ini merupakan saldo awal (tidak memotong kas harian)'),
 
                 DatePicker::make('tanggal_beli')
                     ->label('Tanggal Perolehan / Pembelian')

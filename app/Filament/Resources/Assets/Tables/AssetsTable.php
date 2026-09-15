@@ -3,8 +3,10 @@
 namespace App\Filament\Resources\Assets\Tables;
 
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Columns\Summarizers\Sum; // Library resmi penghitung total otomatis di bawah tabel
 
 class AssetsTable
@@ -17,6 +19,11 @@ class AssetsTable
                     ->label('Nama Aset')
                     ->searchable()
                     ->sortable(),
+
+                IconColumn::make('is_saldo_awal')
+                    ->label('Saldo Awal')
+                    ->boolean()
+                    ->tooltip('Aset saldo awal tidak memotong kas harian'),
 
                 TextColumn::make('jenis')
                     ->label('Jenis')
@@ -125,6 +132,12 @@ class AssetsTable
                         'mati_rusak' => 'Mati / Rusak',
                         'dikonsumsi' => 'Dikonsumsi',
                     ]),
+
+                TernaryFilter::make('is_saldo_awal')
+                    ->label('Saldo Awal')
+                    ->placeholder('Semua Aset')
+                    ->trueLabel('Hanya Saldo Awal')
+                    ->falseLabel('Bukan Saldo Awal'),
             ]);
     }
 }

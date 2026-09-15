@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Transactions\Tables;
 
+use App\Models\Transaction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -62,6 +63,25 @@ class TransactionsTable
                     ->sortable()
                     ->label('Nominal'),
 
+                TextColumn::make('source')
+                    ->label('Sumber')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'asset_buy' => 'Beli Aset',
+                        'asset_sell' => 'Jual Aset',
+                        'asset_maintenance' => 'Perawatan Aset',
+                        default => 'Manual',
+                    })
+                    ->color(fn (string $state): string => match ($state) {
+                        'asset_buy' => 'warning',
+                        'asset_sell' => 'success',
+                        'asset_maintenance' => 'info',
+                        default => 'gray',
+                    })
+                    ->tooltip(fn (Transaction $record): ?string => $record->source === 'manual'
+                        ? null
+                        : 'Transaksi otomatis dikelola sistem, tidak dapat diubah manual.'),
+
                 TextColumn::make('note')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true)
@@ -90,8 +110,13 @@ class TransactionsTable
                     ->relationship('category', 'name'),
             ])
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->disabled(fn (Transaction $record): bool => $record->source !== 'manual')
+                    ->tooltip(fn (Transaction $record): ?string => $record->source === 'manual'
+                        ? null
+                        : 'Transaksi otomatis dikelola sistem, tidak dapat diubah manual.'),
             ])
+            ->checkIfRecordIsSelectableUsing(fn (Transaction $record): bool => $record->source === 'manual')
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
