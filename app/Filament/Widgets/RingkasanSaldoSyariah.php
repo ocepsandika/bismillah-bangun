@@ -9,6 +9,7 @@ use App\Models\Transaction;
 use App\Models\Category;
 use App\Models\Budget;
 use App\Models\Asset;
+use App\Models\Setting;
 use Illuminate\Support\HtmlString;
 use Carbon\Carbon;
 
@@ -143,8 +144,8 @@ class RingkasanSaldoSyariah extends BaseWidget
         $totalKekayaanGabungan = $totalAsetQunyah + $totalAsetTijarah;
 
         // --- 6. ASPEK SYARIAH: ALARM HISAB NISHAZ ZAKAT PERNIAGAAN ---
-        $hargaEmasPerGram = 1450000; 
-        $batasNishabTahunIni = 85 * $hargaEmasPerGram; 
+        $hargaEmasPerGram = Setting::current()->harga_emas_per_gram;
+        $batasNishabTahunIni = 85 * $hargaEmasPerGram;
         $basisSaldoTijarah = $saldoTijarah > 0 ? $saldoTijarah : 0;
         $totalHartaWajibZakat = $basisSaldoTijarah + $totalAsetTijarah;
         
