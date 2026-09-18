@@ -1,48 +1,74 @@
-<?php 
+<?php
 
-namespace App\Filament\Resources\Transactions\Schemas; 
+namespace App\Filament\Resources\Transactions\Schemas;
 
-use Filament\Forms\Components\DatePicker; 
-use Filament\Forms\Components\TextInput; 
-use Filament\Forms\Components\Select; 
-use Filament\Schemas\Components\Grid; 
+use App\Models\Category;
+use App\Models\Produk;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
 
-class TransactionForm 
-{ 
-    public static function configure(Schema $schema): Schema 
-    { 
-        return $schema 
-            ->components([ 
-                // 1. Nama Transaksi (Lebar Penuh)
-                TextInput::make('name') 
-                    ->required() 
-                    ->label('Nama Transaksi'), 
+class TransactionForm
+{
+    public static function configure(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                TextInput::make('name')
+                    ->required()
+                    ->label('Nama Transaksi'),
 
-                // 2. Kategori Keuangan (Lebar Penuh)
-                Select::make('category_id') 
-                    ->relationship('category', 'name') 
-                    ->getOptionLabelFromRecordUsing(fn ($record) => $record->is_expense 
-                        ? "[Keluar] {$record->name}" 
+                Select::make('category_id')
+                    ->relationship(
+                        name: 'category',
+                        titleAttribute: 'name',
+                        modifyQueryUsing: function (Builder $query, Get $get) {
+                            if (filled($get('produk_id'))) {
+                                return $query->where('type', 'tijarah');
+                            }
+                            return $query;
+                        },
+                    )
+                    ->getOptionLabelFromRecordUsing(fn ($record) => $record->is_expense
+                        ? "[Keluar] {$record->name}"
                         : "[Masuk] {$record->name}"
                     )
-                    ->searchable() 
-                    ->preload() 
-                    ->required() 
-                    ->live() // Mengaktifkan validasi real-time untuk mendeteksi Penjualan/Kulakan
-                    ->label('Kategori'), 
+                    ->searchable()
+                    ->preload()
+                    ->required()
+                    ->live()
+                    ->afterStateUpdated(function (Get $get, Set $set) {
+                        self::isiOtomatisNominal($get, $set);
+                    })
+                    ->label('Kategori'),
 
-                // 3. Produk Ritel Master (Lebar Penuh)
                 Select::make('produk_id')
                     ->label('Produk Ritel (Opsional)')
-                    ->relationship('produk', 'nama_produk') 
+                    ->relationship('produk', 'nama_produk')
                     ->searchable()
                     ->preload()
                     ->nullable()
-                    ->live() // 🌟 PENTING: Memicu form agar reaktif menyembunyikan/menampilkan kolom Kuantitas
-                    ->helperText('Kosongkan jika transaksi ini adalah operasional toko biasa (cth: Bayar Listrik).'),
+                    ->live()
+                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                        if (filled($state)) {
+                            $categoryId = $get('category_id');
+                            if ($categoryId) {
+                                $category = Category::find($categoryId);
+                                if ($category && $category->type !== 'tijarah') {
+                                    $set('category_id', null);
+                                }
+                            }
+                        }
+                        $set('kuantitas', 1);
+                        self::isiOtomatisNominal($get, $set);
+                    })
+                    ->helperText('Kosongkan jika transaksi ini adalah operasional toko biasa.'),
 
-                // 4. Kuantitas & Nominal Uang (Berdampingan ke samping)
                 Grid::make(2)
                     ->schema([
                         TextInput::make('kuantitas')
@@ -51,71 +77,66 @@ class TransactionForm
                             ->integer()
                             ->default(1)
                             ->minValue(1)
-                            
-                            // 🌟 KUNCI PINTAR BARU:
-                            ->hidden(fn ($get) => empty($get('produk_id'))) // Tersembunyi total dari layar jika produk_id kosong (Umum)
-                            ->required(fn ($get) => !empty($get('produk_id'))) // Hanya wajib diisi jika produk_id diisi (Ritel)
-                            
-                            ->helperText('Isi jumlah ekor/pcs barang untuk memotong atau menambah stok otomatis.')
-                            
-                            // VALIDASI AMAN: Menolak transaksi jika stok habis / kurang saat jualan ritel
-                            ->rules(function ($get) {
-                                return [
-                                    function (string $attribute, $value, \Closure $fail) use ($get) {
-                                        $produkId = $get('produk_id');
-                                        $categoryId = $get('category_id');
-                                        
-                                        if ($produkId && $categoryId) {
-                                            $produk = \App\Models\Produk::find($produkId);
-                                            $category = \App\Models\Category::find($categoryId);
-                                            
-                                            if ($produk && $category) {
-                                                $apakahIniPenjualan = !$category->is_expense;
+                            ->live()
+                            ->afterStateUpdated(function (Get $get, Set $set) {
+                                self::isiOtomatisNominal($get, $set);
+                            })
+                            ->hidden(fn (Get $get) => empty($get('produk_id')))
+                            ->required(fn (Get $get) => !empty($get('produk_id')))
+                            ->helperText('Isi jumlah ekor/pcs barang untuk memotong atau menambah stok otomatis.'),
 
-                                                if ($apakahIniPenjualan) {
-                                                    if ($produk->stok <= 0) {
-                                                        $fail("Transaksi ditolak! Stok untuk produk '{$produk->nama_produk}' sudah habis (0 Pcs).");
-                                                    } elseif ($value > $produk->stok) {
-                                                        $fail("Transaksi ditolak! Stok '{$produk->nama_produk}' tidak mencukupi. Sisa stok hanya {$produk->stok} Pcs.");
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    },
-                                ];
-                            }),
-                            
-                        TextInput::make('amount') 
-                            ->required() 
-                            ->numeric() 
-                            ->prefix('Rp') 
+                        TextInput::make('amount')
+                            ->required()
+                            ->numeric()
+                            ->prefix('Rp')
                             ->minValue(1)
+                            ->live()
                             ->label('Total Nominal Uang')
-                            // 🌟 Mengubah teks helper secara dinamis sesuai konteks transaksi agar tidak membingungkan kasir
-                            ->helperText(fn ($get) => empty($get('produk_id')) 
-                                ? 'Total nilai nominal uang arus kas berjalan.' 
-                                : 'Total nilai uang transaksi pasar saat ini (aman dari harga fluktuatif).'
-                            ), 
+                            ->helperText(fn (Get $get) => empty($get('produk_id'))
+                                ? 'Total nilai nominal uang arus kas berjalan.'
+                                : 'Terisi otomatis dari harga produk x kuantitas.'
+                            ),
                     ]),
 
-                // 5. Tanggal Masehi (Hijriah otomatis terisi di database via Model static::saving)
-                DatePicker::make('date') 
-                    ->required() 
+                DatePicker::make('date')
+                    ->required()
                     ->default(now())
-                    ->label('Tanggal Masehi'), 
+                    ->label('Tanggal Masehi'),
 
-                // 6. Catatan Tambahan (Lebar Penuh)
-                TextInput::make('note')  
-                    ->label('Catatan'), 
+                TextInput::make('note')
+                    ->label('Catatan'),
 
-                // 7. 🔒 PENGUNCI MULTI-USER: Mengunci otomatis akun Ayah/Ibu/Anak yang sedang login
                 Select::make('user_id')
                     ->relationship('user', 'name')
-                    ->default(auth()->id()) // Set otomatis ID user yang login
-                    ->disabled() // Kunci kolom agar tidak bisa dimanipulasi
-                    ->dehydrated() // Tetap paksa simpan nilai ID ke database saat submit
+                    ->default(auth()->id())
+                    ->disabled()
+                    ->dehydrated()
                     ->required()
                     ->label('Petugas'),
-            ]); 
-    } 
+            ]);
+    }
+
+    private static function isiOtomatisNominal(Get $get, Set $set): void
+    {
+        $produkId = $get('produk_id');
+        $kuantitas = (int) ($get('kuantitas') ?? 0);
+
+        if (! $produkId || $kuantitas <= 0) {
+            return;
+        }
+
+        $produk = Produk::find($produkId);
+        if (! $produk) {
+            return;
+        }
+
+        $categoryId = $get('category_id');
+        $category = $categoryId ? Category::find($categoryId) : null;
+
+        $hargaSatuan = ($category && $category->is_expense)
+            ? $produk->harga_beli
+            : $produk->harga_jual;
+
+        $set('amount', $hargaSatuan * $kuantitas);
+    }
 }
