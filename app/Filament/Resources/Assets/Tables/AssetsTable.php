@@ -35,7 +35,7 @@ class AssetsTable
                         'pertanian_perkebunan' => 'primary',
                         default => 'gray',
                     })
-                    ->toggleable(isToggledHiddenByDefault: true), // TAMBAHAN: Masuk sistem bongkar pasang, default disembunyikan agar layar lega
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('peruntukan')
                     ->label('Status Fiqih')
@@ -46,7 +46,7 @@ class AssetsTable
                         'qunyah' => 'Simpanan (Qunyah)',
                         default => $state
                     })
-                    ->toggleable(isToggledHiddenByDefault: true), // TAMBAHAN: Masuk sistem bongkar pasang, default disembunyikan agar layar lega
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('jumlah')
                     ->label('Jumlah')
@@ -66,6 +66,28 @@ class AssetsTable
                     ->sortable()
                     ->summarize(Sum::make()->numeric(decimalPlaces: 0, locale: 'id')->prefix('Rp ')->label('Total Valuasi')),
 
+                // 🔥 BADGE KESEGARAN VALUASI — indikator umur data nilai pasar
+                TextColumn::make('valuation_age')
+                    ->label('Kesegaran Valuasi')
+                    ->badge()
+                    ->state(fn ($record) => match ($record->valuation_freshness) {
+                        'fresh'   => "✅ {$record->valuation_age_days} hari lalu",
+                        'warning' => "⚠️ {$record->valuation_age_days} hari lalu",
+                        'stale'   => "🔴 {$record->valuation_age_days} hari lalu",
+                        'unknown' => '⚪ Belum pernah',
+                    })
+                    ->color(fn ($record): string => match ($record->valuation_freshness) {
+                        'fresh'   => 'success',
+                        'warning' => 'warning',
+                        'stale'   => 'danger',
+                        default   => 'gray',
+                    })
+                    ->tooltip(fn ($record) => $record->nilai_pasar_updated_at
+                        ? 'Terakhir diperbarui: ' . $record->nilai_pasar_updated_at->format('d-m-Y H:i')
+                        : 'Nilai pasar belum pernah diperbarui'
+                    )
+                    ->sortable(),
+
                 // PERBAIKAN UTAMA: Menghitung profit secara real-time & total summary yang lolos validasi framework
                 TextColumn::make('keuntungan')
                     ->label('Profit / Kerugian')
@@ -77,7 +99,6 @@ class AssetsTable
                         Sum::make()
                             ->label('Total Laba Bersih')
                             ->formatStateUsing(function ($state, Table $table) {
-                                // Trik Cerdas: Menghitung selisih total kumulatif dari seluruh baris yang dirender layar
                                 $records = $table->getRecords();
                                 $totalProfit = $records->sum(fn ($r) => $r->nilai_pasar_sekarang - $r->harga_beli);
                                 return $totalProfit >= 0 ? '+ Rp ' . number_format($totalProfit, 0, ',', '.') : '- Rp ' . number_format(abs($totalProfit), 0, ',', '.');
@@ -102,11 +123,12 @@ class AssetsTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('updated_at')
-                    ->label('Terakhir Cek Harga')
+                // Timestamp mentah — info detail (toggleable, sembunyi default)
+                TextColumn::make('nilai_pasar_updated_at')
+                    ->label('Tgl Update Harga')
                     ->dateTime('d-m-Y H:i')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 SelectFilter::make('jenis')

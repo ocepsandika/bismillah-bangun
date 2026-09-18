@@ -30,6 +30,7 @@ return new class extends Migration {
             // Valuasi Keuangan & Kalkulator Laba Bersih Otomatis
             $table->bigInteger('harga_beli'); 
             $table->bigInteger('nilai_pasar_sekarang'); 
+            $table->timestamp('nilai_pasar_updated_at')->nullable(); // ← BARU
             $table->bigInteger('keuntungan')->default(0); 
             
             // Status Operasional Fisik Lapangan

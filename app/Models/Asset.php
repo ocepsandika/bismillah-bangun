@@ -14,6 +14,7 @@ class Asset extends Model
         'name', 'is_saldo_awal', 'jenis', 'sub_jenis', 'gender', 'peruntukan',
         'tanggal_beli', 'tanggal_jual', 'jumlah', 'satuan', 
         'persentase_milik_pribadi', 'harga_beli', 'nilai_pasar_sekarang', 
+        'nilai_pasar_updated_at',
         'keuntungan', 'status_aset', 'lokasi_keterangan'
     ];
 
@@ -26,7 +27,8 @@ class Asset extends Model
         'keuntungan' => 'integer',
         'tanggal_beli' => 'date',
         'tanggal_jual' => 'date',
-    ];
+        'nilai_pasar_updated_at' => 'datetime',
+    ];  // ← INI YANG HILANG SEBELUMNYA
 
     // Hubungan relasi ke catatan log perawatan berkala
     public function logs(): HasMany
@@ -39,11 +41,50 @@ class Asset extends Model
         return $this->hasMany(Transaction::class);
     }
 
+    /**
+     * Umur data valuasi dalam hari. Null kalau belum pernah diisi.
+     */
+    public function getValuationAgeDaysAttribute(): ?int
+    {
+        if (! $this->nilai_pasar_updated_at) {
+            return null;
+        }
+
+        return (int) $this->nilai_pasar_updated_at->diffInDays(now());
+    }
+
+    /**
+     * Status kesegaran valuasi untuk indikator badge:
+     *   - 'fresh'   → hijau  (< 7 hari)
+     *   - 'warning' → kuning (7–30 hari)
+     *   - 'stale'   → merah  (> 30 hari)
+     *   - 'unknown' → abu-abu (belum pernah diisi)
+     */
+    public function getValuationFreshnessAttribute(): string
+    {
+        $age = $this->valuation_age_days;
+
+        if ($age === null) {
+            return 'unknown';
+        }
+
+        return match (true) {
+            $age < 7   => 'fresh',
+            $age <= 30 => 'warning',
+            default    => 'stale',
+        };
+    }
+
     protected static function booted()
     {
-        // Hitung keuntungan sebelum data disimpan
+        // Hitung keuntungan + auto-catat waktu valuasi sebelum disimpan
         static::saving(function ($asset) {
             $asset->keuntungan = $asset->nilai_pasar_sekarang - $asset->harga_beli;
+
+            // 🔥 Kalau nilai_pasar_sekarang berubah, catat waktunya
+            if ($asset->isDirty('nilai_pasar_sekarang')) {
+                $asset->nilai_pasar_updated_at = now();
+            }
         });
 
         static::created(function (self $asset) {
@@ -89,7 +130,7 @@ class Asset extends Model
                 $category = Category::firstOrCreate(
                     ['name' => $namaKategori],
                     [
-                        'is_expense' => false, // FALSE = Tidak memotong saldo kas harian Anda saat ini
+                        'is_expense' => false,
                         'type' => $this->peruntukan === 'tijarah' ? 'tijarah' : 'rumah_tangga',
                     ]
                 );
